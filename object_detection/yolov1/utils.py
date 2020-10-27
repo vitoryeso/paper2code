@@ -1,11 +1,23 @@
-def IOU(boxA, boxB):
-    xAmin, xAmax = boxA[0] - boxA[2]/2, boxA[0] + boxA[2]/2
-    yAmin, yAmax = boxA[1] - boxA[3]/2, boxA[1] + boxA[3]/2
-    
-    xBmin, xBmax = boxB[0] - boxB[2]/2, boxB[0] + boxB[2]/2
-    yBmin, yBmax = boxB[1] - boxB[3]/2, boxB[1] + boxB[3]/2
+def overlap(x1, w1, x2, w2):
+    left = max(x1 - w1/2, x2 - w2/2)
+    right = min(x1 + w1/2, x2 + w2/2)
+    return right - left
 
-    # intersection rectangle
-    xA = max(xAmin, xBmin)
-    yA = max(yAmin, yBmin)
-    xB = min
+def intersection(boxA, boxB):
+    # box is like [x, y, w, h]
+    x1, y1, w1, h1 = boxA
+    x2, y2, w2, h2 = boxB
+    intersection_w = overlap(x1, w1, x2, w2)
+    intersection_h = overlap(y1, h1, y2, h2)
+    if intersection_w < 0 or intersection_h < 0:
+        return 0
+    return intersection_w * intersection_h
+
+def IOU(boxA, boxB):
+    i = intersection(boxA, boxB)
+
+    # the union is simply Area(A) + Area(B) - intersection(A, B)
+    u = boxA[2]*boxA[3] + boxB[2]*boxB[3] - i
+    if i == 0 or u == 0:
+        return 0
+    return i/u
