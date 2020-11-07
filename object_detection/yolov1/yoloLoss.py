@@ -19,40 +19,42 @@ class yoloV1Loss:
      # pseudo_label: array of objects
      #      like (n_objects, 4coords + class)
      # output:
-     #      (S, S, B*(5 + C)) 
-     #      x and y relative to the cell
-     #      w and h relative to the entire img
+     #      (S, S, B*len([confidence, x, y, w, h]) + C) 
      #      confidence is a boolean here because we need the predictions to compute the IOU
      #      if confidence is true, we compute iou. if not, we dont.
-    label = np.zeros((self.Sx, self.Sy, self.B*(5+self.C)), dtype=np.float16)
+     #      x and y relative to the cell
+     #      w and h relative to the entire img
+    label = np.zeros((self.Sx, self.Sy, self.B*5 + self.C), dtype=np.float16)
     for x, y, w, h, class_id in pseudo_label:
         Sx = int(x*self.Sx/self.width)
         Sy = int(y*self.Sy/self.height)
-        start = 0
-        end = 5 + self.C
 
-        # while already have an object with the same class in the same cell, we go to the next B
-        while label[Sx, Sy, start] != 0:
-            start += end + 1
-            end = start + 5 + self.C
-        if end < self.B*(5 + self.C):
+        # class probabilities
+        assert class_id < self.C
+        if label[Sx, Sy, 5*self.B + class_id] != 1.0:
+            label[Sx, Sy, 5*self.B + class_id] = 1.0
+
+        start = 0
+        # while already have an object in the same cell, we go to the next Bounding box
+        while label[Sx, Sy, start] != 0 and start <= 5*(self.B-1):
+            start += 5
+
+        if start <= 5*(self.B-1):
+            # confidence. this means that we'll compute the iou for this Bounding box
+            label[Sx, Sy, start] = 1.0
+            
             # new coordinates relatives to the begin of the respective cell
             new_x = (x*self.Sx - Sx*self.width)/self.width
             new_y = (y*self.Sy - Sy*self.height)/self.height
-            # [x, y, w, h] + [class_0_prob, ... class_C_prob] + [confidence_score]
-            # remember, confidence is P(obj) * IOU(true, predicted)
-            # but we only compute this IOU at the training, therefore we will multiply later label[5]*IOU
-            classes = np.zeros(self.C + 1, dtype=np.float16)
-
-            classes[class_id] = 1.0 # class score
-            classes[-1] = 1.0 # confidence 
 
             coords = np.array([new_x, new_y, w/self.width, h/self.height], dtype=np.float16)
 
-            label[Sx, Sy, start:end] = np.hstack([coords, classes])
-            del classes, coords
+            print(coords)
+            label[Sx, Sy, start+1:start+5] = coords
+            del coords
             
     return label
+"""
 
     def compute(self, label, predictions):
         loss = 0.0
@@ -80,4 +82,4 @@ class yoloV1Loss:
                     # adding 
                     else:
 
-        
+""" 
