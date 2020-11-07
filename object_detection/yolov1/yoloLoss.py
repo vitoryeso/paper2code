@@ -2,11 +2,10 @@ import tensorflow as tf
 import numpy as np
 from math import floor
 
-
 class yoloV1Loss:
-  def __init__(self, lambda_coord=0.5, lambda_class=0.5, S=8, B=2, C=3, width=224, height=224):
+  def __init__(self, lambda_coord=0.5, lambda_noobj=0.5, S=8, B=2, C=3, width=224, height=224):
     self.lambda_coord = lambda_coord
-    self.lambda_class = lambda_class
+    self.lambda_class = lambda_noobj
     self.B = B
     self.C = C
 
@@ -15,9 +14,6 @@ class yoloV1Loss:
 
     self.Sx = S
     self.Sy = S
-    #self.S = range(1, self.width/S + 1)
-    #map(lambda x: x*self.width, self.S)
-
 
   def transform_label(self, pseudo_label):
      # pseudo_label: array of objects
@@ -57,3 +53,31 @@ class yoloV1Loss:
             del classes, coords
             
     return label
+
+    def compute(self, label, predictions):
+        loss = 0.0
+        label = self.transform_label(label)
+
+        # todo: loss for each coordinate and confidence, if that bounding box is responsible for the object
+        # loss for classes predictions. if the object class falls into the cell 
+        # loss for each cell which failed predicting an object center
+        # loss for each class, at each grid cell
+        
+        # (S, S, (x, y, w, h, c0, ..., cC, confidence))
+        for sx in range(self.Sx):
+            for sy in range(self.Sy):
+                for b in range(1, self.B):
+
+                    # if exist an object in this cell (checking if confidence is != 0)
+                    if label[sx, sy, b*(5+self.C)] != 0:
+                        if predictions[sx, sy, b*(5+self.C)] == 0:
+                            # compute obj confidence loss
+                            label_confidence = label[sx, sy, b*(5+self.C)]
+                            predictions_confidence = predictions[sx, sy, b*(5+self.C)]
+ 
+                            loss += (label_confidence - predictions_confidence)**2
+
+                    # adding 
+                    else:
+
+        
