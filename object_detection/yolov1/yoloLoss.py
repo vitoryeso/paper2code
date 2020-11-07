@@ -1,5 +1,7 @@
 import tensorflow as tf
 import numpy as np
+
+from utils import IOU
 from math import floor
 
 class yoloV1Loss:
@@ -54,6 +56,16 @@ class yoloV1Loss:
             
     return label
 
+    def responsible_box(idx, label, predictions):
+        max_iou = 0.0
+        responsible = 0
+        for b in self.B:
+            iou = IOU(label[5*idx+1:5*idx+4], predictions[5*b+1:5*b+4])
+            if max_iou < iou:
+                max_iou = iou
+                responsible = b
+        return b, max_iou
+
     def compute(self, label, predictions):
         total_loss = 0.0
         label = self.transform_label(label)
@@ -63,6 +75,14 @@ class yoloV1Loss:
 
         for sx in range(self.Sx):
             for sy in range(self.Sy):
+                # classes probabilities loss
+                for c in self.C:
+                    label_prob = label[sx, sy, self.B*5 + c]
+                    predict_prob = label[sx, sy, self.B*5 + c]
+                    loss += (label_prob - predict_prob)**2
+
+                bndbox_ids = []
+                n_objects = 0
                 for b in range(self.B):
                     # checking if exist more any object inside this cell
                     if label[sx, sy, b*5] == 0.0:
@@ -70,5 +90,24 @@ class yoloV1Loss:
                         # label confidence is zero. lambda_noobj * (label_confidence - predicted_confidence)**2
                         loss += self.lambda_noobj * predictions[sx, sy, b*5]**2
                     else:
+                        true_objects += 1
+                        bndbox_ids.append(b)
+                if true_objects > 1:
+                    print("oh noooo")
+                elif true_objects == 1:
+                    responsible, iou = self.responsible_box(bndbox_ids[0], label[sx, sy, :], predictions[sx, sy, :])
 
-                    
+                    # obj confidence loss
+                    loss += (iou - predictions[sx, sy, responsible*5])**2
+                        
+                    # x, y loss
+                    x_loss = (label[sx, sy, 5*bndbox_ids[0] + 1] - predictions[sx, sy, responsible*5 + 1])**2
+                    y_loss = (label[sx, sy, 5*bndbox_ids[0] + 2] - predictions[sx, sy, responsible*5 + 2])**2
+                    loss += self.lambda_coord * (x_loss + y_loss)
+
+                    # w, h loss
+                    w_loss = (label[sx, sy, 5*bndbox_ids[0] + 3] - predictions[sx, sy, responsible*5 + 3])**2
+                    h_loss = (label[sx, sy, 5*bndbox_ids[0] + 4] - predictions[sx, sy, responsible*5 + 4])**2
+                    loss += self.lambda_coord * (w_loss + h_loss)
+
+        return loss
