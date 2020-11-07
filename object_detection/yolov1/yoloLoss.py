@@ -49,37 +49,26 @@ class yoloV1Loss:
 
             coords = np.array([new_x, new_y, w/self.width, h/self.height], dtype=np.float16)
 
-            print(coords)
             label[Sx, Sy, start+1:start+5] = coords
             del coords
             
     return label
-"""
 
     def compute(self, label, predictions):
-        loss = 0.0
+        total_loss = 0.0
         label = self.transform_label(label)
 
-        # todo: loss for each coordinate and confidence, if that bounding box is responsible for the object
-        # loss for classes predictions. if the object class falls into the cell 
-        # loss for each cell which failed predicting an object center
-        # loss for each class, at each grid cell
-        
-        # (S, S, (x, y, w, h, c0, ..., cC, confidence))
+        # first we need to get the bounding boxes which are responsible for the prediction
+        # if the cell_label have an or more objects, we choose the bounding box with highest IOU to be the responsible
+
         for sx in range(self.Sx):
             for sy in range(self.Sy):
-                for b in range(1, self.B):
-
-                    # if exist an object in this cell (checking if confidence is != 0)
-                    if label[sx, sy, b*(5+self.C)] != 0:
-                        if predictions[sx, sy, b*(5+self.C)] == 0:
-                            # compute obj confidence loss
-                            label_confidence = label[sx, sy, b*(5+self.C)]
-                            predictions_confidence = predictions[sx, sy, b*(5+self.C)]
- 
-                            loss += (label_confidence - predictions_confidence)**2
-
-                    # adding 
+                for b in range(self.B):
+                    # checking if exist more any object inside this cell
+                    if label[sx, sy, b*5] == 0.0:
+                        # compute noobj loss
+                        # label confidence is zero. lambda_noobj * (label_confidence - predicted_confidence)**2
+                        loss += self.lambda_noobj * predictions[sx, sy, b*5]**2
                     else:
 
-""" 
+                    
