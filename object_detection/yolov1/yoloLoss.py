@@ -66,8 +66,12 @@ class yoloV1Loss:
               responsible = b
       return b, max_iou
 
+  def compute_batch(self, labels_batch, predictions_batch):
+      return np.mean([ self.compute(label, predictions) for label, predictions in zip(labels_batch, predictions_batch) ])
+          
   def compute(self, label, predictions):
       loss = 0.0
+      label = self.transform_label(label)
 
       # first we need to get the bounding boxes which are responsible for the prediction
       # if the cell_label have an or more objects, we choose the bounding box with highest IOU to be the responsible
