@@ -56,18 +56,58 @@ class yoloV1Loss:
             
     return label
 
-  def responsible_box(self, idx, label, predictions):
+  def get_real_boxes(self, boxA, boxB, sx, sy):
+      real_boxA = []
+      real_boxB = []
+      cell_width = self.width/self.Sx
+      cell_height = self.height/self.Sy
+
+      real_boxA.append(cell_width * (sx + boxA[0]))
+      real_boxA.append(cell_height * (sy + boxA[1]))
+      real_boxB.append(cell_width * (sx + boxB[0]))
+      real_boxB.append(cell_height * (sy + boxB[1]))
+
+      real_boxA.append(self.width * boxA[2])
+      real_boxA.append(self.height * boxA[3])
+      real_boxB.append(self.width * boxA[2])
+      real_boxB.append(self.height * boxA[3])
+
+      return real_boxA, real_boxB
+
+
+  def responsible_box(self, idx, label, predictions, sx, sy):
       max_iou = 0.0
       responsible = 0
       for b in range(self.B):
-          iou = IOU(label[5*idx+1:5*idx+5], predictions[5*b+1:5*b+5])
+          boxA, boxB = self.get_real_boxes(label[5*idx+1:5*idx+5],
+                          predictions[5*b+1:5*b+5],
+                          sx, sy)
+          iou = IOU(boxA, boxB) 
+
           if max_iou < iou:
               max_iou = iou
               responsible = b
       return b, max_iou
 
+  """
+  def calc_mAP(self, label, predictionis, iou_thresh, score_thresh):
+      label = self.transform_label(label)
+      for sx in range(self.Sx):
+        for sy in range(self.Sy):
+          for b in range(self.B):
+            # exist an object in this cell
+            if label[sx, sy, b*5] != 0.0:
+              _, max_iou = responsible_box(b, label[sx, sy, :], predictions[sx, sy, :]) 
+              if max_iou >= iou_thresh:
+                max_score = max(predictions[sx, sy, self.B*5:self.B*5+self.C])
+                if max_score >=
+  """
+
+            
+
+
   def compute_batch(self, labels_batch, predictions_batch):
-      return np.mean([ self.compute(label, predictions) for label, predictions in zip(labels_batch, predictions_batch) ])
+    return np.mean([ self.compute(label, predictions) for label, predictions in zip(labels_batch, predictions_batch) ])
           
   def compute(self, label, predictions):
       loss = 0.0
@@ -98,7 +138,7 @@ class yoloV1Loss:
               if n_objects > 1:
                   print("oh noooo")
               elif n_objects == 1:
-                  responsible, iou = self.responsible_box(bndbox_ids[0], label[sx, sy, :], predictions[sx, sy, :])
+                  responsible, iou = self.responsible_box(bndbox_ids[0], label[sx, sy, :], predictions[sx, sy, :], sx, sy)
 
                   # obj confidence loss
                   loss += (iou - predictions[sx, sy, responsible*5])**2
